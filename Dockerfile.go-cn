@@ -1,0 +1,42 @@
+ARG BASE_IMAGE=debian12-cn:tools
+ARG GO_VERSION=1.25.4
+
+FROM ${BASE_IMAGE} AS go-downloader
+ARG GO_VERSION
+RUN set -eux; \
+    arch="$(uname -m)"; \
+    case "$arch" in \
+      x86_64) GO_ARCH=amd64 ;; \
+      aarch64) GO_ARCH=arm64 ;; \
+      armv7l|armv6l) GO_ARCH=armv6l ;; \
+      ppc64le) GO_ARCH=ppc64le ;; \
+      s390x) GO_ARCH=s390x ;; \
+      *) exit 1 ;; \
+    esac; \
+    base_cn="https://golang.google.cn/dl"; base_dl="https://dl.google.com/go"; \
+    curl -fsSL --retry 5 --retry-delay 2 --connect-timeout 10 \
+      "$base_dl/go${GO_VERSION}.linux-${GO_ARCH}.tar.gz.sha256" -o /go.sha256 || \
+    curl -fsSL --retry 5 --retry-delay 2 --connect-timeout 10 \
+      "$base_cn/go${GO_VERSION}.linux-${GO_ARCH}.tar.gz.sha256" -o /go.sha256; \
+    curl -fsSL --retry 5 --retry-delay 2 --connect-timeout 10 \
+      "$base_cn/go${GO_VERSION}.linux-${GO_ARCH}.tar.gz" -o /go.tar.gz || \
+    curl -fsSL --retry 5 --retry-delay 2 --connect-timeout 10 \
+      "$base_dl/go${GO_VERSION}.linux-${GO_ARCH}.tar.gz" -o /go.tar.gz; \
+    echo "$(cat /go.sha256)  /go.tar.gz" | sha256sum -c -
+
+FROM ${BASE_IMAGE} AS go-runtime
+ARG DEBIAN_FRONTEND=noninteractive
+ARG GO_VERSION
+ENV GO111MODULE=on GOPROXY=https://goproxy.cn,direct PATH=/usr/local/go/bin:$PATH GOPATH=/go GOMODCACHE=/go/pkg/mod GOCACHE=/go/build-cache
+RUN --mount=type=cache,target=/var/cache/apt \
+    --mount=type=cache,target=/var/lib/apt/lists \
+    set -eux; \
+    apt-get update; \
+    apt-get install -y --no-install-recommends git build-essential pkg-config; \
+    rm -rf /var/lib/apt/lists/*
+COPY --from=go-downloader /go.tar.gz /tmp/go.tar.gz
+RUN set -eux; \
+    tar -C /usr/local -xzf /tmp/go.tar.gz; \
+    rm /tmp/go.tar.gz; \
+    mkdir -p "$GOPATH/bin" "$GOMODCACHE" "$GOCACHE"
+WORKDIR /workspace

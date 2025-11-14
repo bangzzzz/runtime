@@ -1,0 +1,17 @@
+FROM debian:12
+
+ARG DEBIAN_FRONTEND=noninteractive
+ENV TZ=Asia/Shanghai
+
+RUN set -eux; \
+    printf "deb http://mirrors.aliyun.com/debian/ bookworm main contrib non-free non-free-firmware\n\
+deb http://mirrors.aliyun.com/debian/ bookworm-updates main contrib non-free non-free-firmware\n\
+deb http://mirrors.aliyun.com/debian/ bookworm-backports main contrib non-free non-free-firmware\n\
+deb http://mirrors.aliyun.com/debian-security bookworm-security main contrib non-free non-free-firmware\n" > /etc/apt/sources.list; \
+    apt-get update; \
+    apt-get install -y --no-install-recommends tzdata ca-certificates \
+        procps htop telnet iproute2 net-tools iputils-ping traceroute dnsutils \
+        curl wget less vim-tiny; \
+    ln -snf /usr/share/zoneinfo/Asia/Shanghai /etc/localtime; \
+    echo Asia/Shanghai > /etc/timezone; \
+    rm -rf /var/lib/apt/lists/*
